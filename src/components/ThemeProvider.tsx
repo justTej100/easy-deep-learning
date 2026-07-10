@@ -27,22 +27,24 @@ function applyTheme(theme: Theme) {
   root.style.colorScheme = theme;
 }
 
+function readTheme(): Theme {
+  if (typeof window === "undefined") return "light";
+  const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
+  if (stored === "light" || stored === "dark") return stored;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("light");
-  const [ready, setReady] = useState(false);
+  const [theme, setThemeState] = useState<Theme>(readTheme);
+  const [ready, setReady] = useState(() => typeof window !== "undefined");
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    const preferred =
-      stored === "light" || stored === "dark"
-        ? stored
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
-    setThemeState(preferred);
-    applyTheme(preferred);
-    setReady(true);
-  }, []);
+    applyTheme(theme);
+    if (!ready) {
+      const id = requestAnimationFrame(() => setReady(true));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [theme, ready]);
 
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next);

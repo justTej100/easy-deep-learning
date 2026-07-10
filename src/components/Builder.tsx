@@ -77,70 +77,58 @@ function applyShapes(
   });
 }
 
+function loadInitialGraph() {
+  const starter = createStarterGraph();
+  const fromUrl = readProjectFromLocation();
+  if (fromUrl) {
+    const restored = fromProjectState(fromUrl);
+    return {
+      nodes: applyShapes(restored.nodes, restored.edges) as LayerFlowNode[],
+      edges: restored.edges,
+      mode: restored.mode,
+    };
+  }
+  return {
+    nodes: applyShapes(starter.nodes, starter.edges) as LayerFlowNode[],
+    edges: starter.edges,
+    mode: "beginner" as const,
+  };
+}
+
 function BuilderInner() {
-  const starter = useMemo(() => createStarterGraph(), []);
-  const [nodes, setNodes, onNodesChange] = useNodesState<LayerFlowNode>(
-    starter.nodes as LayerFlowNode[],
-  );
-  const [edges, setEdges, onEdgesChange] = useEdgesState(starter.edges);
-  const [mode, setMode] = useState<"beginner" | "research">("beginner");
+  const [initial] = useState(loadInitialGraph);
+  const [nodes, setNodes, onNodesChange] = useNodesState<LayerFlowNode>(initial.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
+  const [mode, setMode] = useState<"beginner" | "research">(initial.mode);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<"explain" | "code">("explain");
-  const [hydrated, setHydrated] = useState(false);
   const { screenToFlowPosition } = useReactFlow();
   const fileRef = useRef<HTMLInputElement>(null);
   const idCounter = useRef(0);
   const lastFp = useRef("");
 
-  useEffect(() => {
-    const fromUrl = readProjectFromLocation();
-    if (fromUrl) {
-      const restored = fromProjectState(fromUrl);
-      setMode(restored.mode);
-      setNodes(applyShapes(restored.nodes, restored.edges) as LayerFlowNode[]);
-      setEdges(restored.edges);
-    } else {
-      setNodes(applyShapes(starter.nodes, starter.edges) as LayerFlowNode[]);
-    }
-    setHydrated(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const nodesFingerprint = nodes
+    .map((n) => `${n.id}:${n.data.layerType}:${JSON.stringify(n.data.params)}`)
+    .join("|");
+  const edgesFingerprint = edges.map((e) => `${e.source}->${e.target}`).join("|");
 
-  // Recompute tensor shapes when connectivity or layer params change (not on drag).
   const structureKey = useMemo(
-    () =>
-      [
-        nodes
-          .map(
-            (n) =>
-              `${n.id}:${n.data.layerType}:${JSON.stringify(n.data.params)}`,
-          )
-          .join("|"),
-        edges.map((e) => `${e.source}->${e.target}`).join("|"),
-      ].join("::"),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      nodes
-        .map((n) => `${n.id}:${n.data.layerType}:${JSON.stringify(n.data.params)}`)
-        .join("|"),
-      edges.map((e) => `${e.source}->${e.target}`).join("|"),
-    ],
+    () => `${nodesFingerprint}::${edgesFingerprint}`,
+    [nodesFingerprint, edgesFingerprint],
   );
 
   useEffect(() => {
-    if (!hydrated) return;
     if (structureKey === lastFp.current) return;
     lastFp.current = structureKey;
     setNodes((nds) => applyShapes(nds, edges) as LayerFlowNode[]);
-  }, [structureKey, edges, hydrated, setNodes]);
+  }, [structureKey, edges, setNodes]);
 
   useEffect(() => {
-    if (!hydrated) return;
     const t = setTimeout(() => {
       writeProjectToUrl(toProjectState(nodes, edges, mode));
     }, 400);
     return () => clearTimeout(t);
-  }, [nodes, edges, mode, hydrated]);
+  }, [nodes, edges, mode]);
 
   const onConnect = useCallback(
     (connection: Connection) => {
