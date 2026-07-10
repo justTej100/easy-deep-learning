@@ -1,11 +1,32 @@
 @import "tailwindcss";
 @import "@xyflow/react/dist/style.css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f3efe6;
   --foreground: #1c1917;
-  --edl-teal: #0f766e;
+  --edl-bg: #f3efe6;
   --edl-ink: #1c1917;
+  --edl-muted: #78716c;
+  --edl-surface: #fffcf7;
+  --edl-surface-2: #ebe6dc;
+  --edl-border: #d6d3d1;
+  --edl-teal: #0f766e;
+  --edl-canvas: #f3efe6;
+}
+
+.dark {
+  --background: #0c1210;
+  --foreground: #e7e5e4;
+  --edl-bg: #0c1210;
+  --edl-ink: #e7e5e4;
+  --edl-muted: #a8a29e;
+  --edl-surface: #141c19;
+  --edl-surface-2: #1c2622;
+  --edl-border: #2a3531;
+  --edl-teal: #2dd4bf;
+  --edl-canvas: #0f1614;
 }
 
 @theme inline {
@@ -17,8 +38,8 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--edl-bg);
+  color: var(--edl-ink);
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
@@ -34,4 +55,104 @@ body {
 
 .react-flow__attribution {
   display: none;
+}
+
+.dark .react-flow__controls-button {
+  background: var(--edl-surface);
+  border-color: var(--edl-border);
+  fill: var(--edl-ink);
+}
+
+.dark .react-flow__minimap {
+  background: var(--edl-surface) !important;
+}
+
+/* Landing motion */
+.edl-grid-bg {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--edl-teal) 12%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--edl-teal) 12%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 75%);
+}
+
+@keyframes edl-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes edl-edge-draw {
+  from {
+    stroke-dashoffset: 240;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes edl-node-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.85;
+  }
+}
+
+@keyframes edl-cta-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, #0f766e 35%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+.edl-fade-up {
+  animation: edl-fade-up 0.7s ease-out both;
+}
+
+.edl-fade-up-delay {
+  animation: edl-fade-up 0.85s ease-out 0.15s both;
+}
+
+.edl-edge-draw path {
+  stroke-dasharray: 240;
+  animation: edl-edge-draw 1.4s ease-out both;
+}
+
+.edl-nodes-pulse circle {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: edl-node-pulse 2.8s ease-in-out infinite;
+}
+
+.edl-cta-pulse {
+  animation: edl-cta-pulse 2.4s ease-out infinite;
+}
+
+.edl-hero-glow {
+  background:
+    radial-gradient(ellipse 80% 60% at 70% 40%, color-mix(in oklab, var(--edl-teal) 18%, transparent), transparent 70%),
+    var(--edl-surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edl-fade-up,
+  .edl-fade-up-delay,
+  .edl-edge-draw path,
+  .edl-nodes-pulse circle,
+  .edl-cta-pulse {
+    animation: none;
+  }
 }

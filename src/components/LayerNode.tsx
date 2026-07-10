@@ -13,16 +13,18 @@ function LayerNodeComponent({ data, selected }: NodeProps<LayerFlowNode>) {
 
   return (
     <div
-      className={`min-w-[180px] rounded-lg border-2 bg-white shadow-sm transition-shadow ${
-        selected ? "ring-2 ring-offset-2 ring-teal-600 shadow-md" : ""
-      } ${hasError ? "border-rose-500" : "border-stone-200"}`}
+      className={`min-w-[180px] rounded-lg border-2 bg-[var(--edl-surface)] shadow-sm transition-shadow ${
+        selected
+          ? "ring-2 ring-offset-2 ring-teal-600 shadow-md ring-offset-[var(--edl-canvas)]"
+          : ""
+      } ${hasError ? "border-rose-500" : "border-[var(--edl-border)]"}`}
       style={{ borderTopColor: def.color, borderTopWidth: 4 }}
     >
       {data.layerType !== "Input" && (
         <Handle
           type="target"
           position={Position.Top}
-          className="!h-2.5 !w-2.5 !border-2 !border-white !bg-stone-500"
+          className="!h-2.5 !w-2.5 !border-2 !border-[var(--edl-surface)] !bg-stone-500"
         />
       )}
 
@@ -35,25 +37,27 @@ function LayerNodeComponent({ data, selected }: NodeProps<LayerFlowNode>) {
             {def.category === "research" ? "research" : def.category}
           </span>
           {hasError && (
-            <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
+            <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 dark:bg-rose-950 dark:text-rose-300">
               fix me
             </span>
           )}
         </div>
-        <div className="mt-0.5 text-sm font-semibold text-stone-900">{def.label}</div>
-        <div className="mt-1 font-mono text-[11px] text-stone-500">
+        <div className="mt-0.5 text-sm font-semibold text-[var(--edl-ink)]">
+          {def.label}
+        </div>
+        <div className="mt-1 font-mono text-[11px] text-stone-500 dark:text-stone-400">
           {data.layerType === "Input" ? (
             <span>out {formatShape(data.outputShape)}</span>
           ) : (
             <span>
               {formatShape(data.inputShape)}
-              <span className="mx-1 text-stone-300">→</span>
+              <span className="mx-1 text-stone-300 dark:text-stone-600">→</span>
               {formatShape(data.outputShape)}
             </span>
           )}
         </div>
         {data.layerType === "LoopBlock" && (
-          <div className="mt-1 text-[11px] text-cyan-800">
+          <div className="mt-1 text-[11px] text-cyan-800 dark:text-cyan-300">
             ×{data.params.repeats ?? 2} shared passes
           </div>
         )}
@@ -63,7 +67,7 @@ function LayerNodeComponent({ data, selected }: NodeProps<LayerFlowNode>) {
         <Handle
           type="source"
           position={Position.Bottom}
-          className="!h-2.5 !w-2.5 !border-2 !border-white !bg-stone-500"
+          className="!h-2.5 !w-2.5 !border-2 !border-[var(--edl-surface)] !bg-stone-500"
         />
       )}
     </div>

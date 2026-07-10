@@ -25,10 +25,13 @@ import {
   useState,
   type DragEvent,
 } from "react";
+import Link from "next/link";
 import { LayerNode, type LayerFlowNode } from "@/components/LayerNode";
 import { Palette } from "@/components/Palette";
 import { ExplainPanel } from "@/components/ExplainPanel";
 import { CodePanel } from "@/components/CodePanel";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "@/components/ThemeProvider";
 import { propagateShapes } from "@/lib/shapes";
 import {
   createStarterGraph,
@@ -222,27 +225,32 @@ function BuilderInner() {
   };
 
   const errorCount = nodes.filter((n) => n.data.error).length;
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   return (
-    <div className="flex h-dvh flex-col bg-stone-100 text-stone-900">
-      <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-stone-200 bg-white px-4 py-2.5">
+    <div className="flex h-dvh flex-col bg-[var(--edl-bg)] text-[var(--edl-ink)]">
+      <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--edl-border)] bg-[var(--edl-surface)] px-4 py-2.5">
         <div className="mr-2">
-          <p className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight text-teal-900">
+          <Link
+            href="/"
+            className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight text-teal-900 dark:text-teal-300"
+          >
             easy deep learning
-          </p>
-          <p className="text-[11px] text-stone-500">
+          </Link>
+          <p className="text-[11px] text-stone-500 dark:text-stone-400">
             Visual PyTorch builder · Fashion-MNIST · no account
           </p>
         </div>
 
-        <div className="flex rounded-md border border-stone-200 p-0.5 text-[12px]">
+        <div className="flex rounded-md border border-[var(--edl-border)] p-0.5 text-[12px]">
           <button
             type="button"
             onClick={() => setMode("beginner")}
             className={`rounded px-2.5 py-1 font-medium ${
               mode === "beginner"
-                ? "bg-teal-800 text-white"
-                : "text-stone-600 hover:bg-stone-50"
+                ? "bg-teal-800 text-white dark:bg-teal-600"
+                : "text-stone-600 hover:bg-[var(--edl-surface-2)] dark:text-stone-300"
             }`}
           >
             Beginner
@@ -252,8 +260,8 @@ function BuilderInner() {
             onClick={() => setMode("research")}
             className={`rounded px-2.5 py-1 font-medium ${
               mode === "research"
-                ? "bg-cyan-800 text-white"
-                : "text-stone-600 hover:bg-stone-50"
+                ? "bg-cyan-800 text-white dark:bg-cyan-700"
+                : "text-stone-600 hover:bg-[var(--edl-surface-2)] dark:text-stone-300"
             }`}
           >
             Research
@@ -261,16 +269,17 @@ function BuilderInner() {
         </div>
 
         {errorCount > 0 && (
-          <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-medium text-rose-800">
+          <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-medium text-rose-800 dark:bg-rose-950 dark:text-rose-300">
             {errorCount} shape {errorCount === 1 ? "issue" : "issues"}
           </span>
         )}
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <ThemeToggle />
           <button
             type="button"
             onClick={resetStarter}
-            className="rounded border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-700 hover:bg-stone-50"
+            className="rounded border border-[var(--edl-border)] bg-[var(--edl-surface)] px-2.5 py-1 text-[11px] font-medium text-stone-700 hover:bg-[var(--edl-surface-2)] dark:text-stone-300"
           >
             Reset starter CNN
           </button>
@@ -279,14 +288,14 @@ function BuilderInner() {
             onClick={() =>
               downloadProjectFile(toProjectState(nodes, edges, mode))
             }
-            className="rounded border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-700 hover:bg-stone-50"
+            className="rounded border border-[var(--edl-border)] bg-[var(--edl-surface)] px-2.5 py-1 text-[11px] font-medium text-stone-700 hover:bg-[var(--edl-surface-2)] dark:text-stone-300"
           >
             Download project
           </button>
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="rounded border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-700 hover:bg-stone-50"
+            className="rounded border border-[var(--edl-border)] bg-[var(--edl-surface)] px-2.5 py-1 text-[11px] font-medium text-stone-700 hover:bg-[var(--edl-surface-2)] dark:text-stone-300"
           >
             Import project
           </button>
@@ -321,7 +330,7 @@ function BuilderInner() {
               writeProjectToUrl(toProjectState(nodes, edges, mode));
               void navigator.clipboard.writeText(window.location.href);
             }}
-            className="rounded bg-teal-800 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-teal-700"
+            className="rounded bg-teal-800 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-teal-700 dark:bg-teal-600 dark:hover:bg-teal-500"
           >
             Copy share link
           </button>
@@ -350,28 +359,29 @@ function BuilderInner() {
             fitViewOptions={{ padding: 0.2 }}
             deleteKeyCode={["Backspace", "Delete"]}
             proOptions={{ hideAttribution: true }}
-            className="bg-[#f3efe6]"
+            className="bg-[var(--edl-canvas)]"
+            colorMode={isDark ? "dark" : "light"}
           >
             <Background
               variant={BackgroundVariant.Dots}
               gap={18}
               size={1}
-              color="#d6d3d1"
+              color={isDark ? "#2a3531" : "#d6d3d1"}
             />
             <Controls showInteractive={false} />
             <MiniMap
-              nodeColor={() => "#0f766e"}
-              maskColor="rgba(28,25,23,0.1)"
-              className="!bg-white/80"
+              nodeColor={() => (isDark ? "#2dd4bf" : "#0f766e")}
+              maskColor={isDark ? "rgba(0,0,0,0.35)" : "rgba(28,25,23,0.1)"}
+              className="!bg-[var(--edl-surface)]/80"
             />
           </ReactFlow>
 
           {mode === "research" && (
-            <div className="pointer-events-none absolute left-3 top-3 max-w-sm rounded-md border border-cyan-200 bg-cyan-50/95 px-3 py-2 text-[11px] leading-relaxed text-cyan-950 shadow-sm">
+            <div className="pointer-events-none absolute left-3 top-3 max-w-sm rounded-md border border-cyan-200 bg-cyan-50/95 px-3 py-2 text-[11px] leading-relaxed text-cyan-950 shadow-sm dark:border-cyan-800 dark:bg-cyan-950/90 dark:text-cyan-100">
               <strong className="font-semibold">Research mode:</strong> drop a
               Loop Block to reuse shared weights N times — the code generator
               emits a{" "}
-              <code className="rounded bg-cyan-100 px-1 font-mono">
+              <code className="rounded bg-cyan-100 px-1 font-mono dark:bg-cyan-900">
                 for _ in range(N)
               </code>{" "}
               over one module.
@@ -379,15 +389,15 @@ function BuilderInner() {
           )}
         </div>
 
-        <aside className="flex w-[380px] shrink-0 flex-col border-l border-stone-200 bg-white">
-          <div className="flex border-b border-stone-200 text-[12px]">
+        <aside className="flex w-[380px] shrink-0 flex-col border-l border-[var(--edl-border)] bg-[var(--edl-surface)]">
+          <div className="flex border-b border-[var(--edl-border)] text-[12px]">
             <button
               type="button"
               onClick={() => setRightTab("explain")}
               className={`flex-1 px-3 py-2 font-medium ${
                 rightTab === "explain"
-                  ? "border-b-2 border-teal-800 text-teal-900"
-                  : "text-stone-500"
+                  ? "border-b-2 border-teal-800 text-teal-900 dark:border-teal-400 dark:text-teal-300"
+                  : "text-stone-500 dark:text-stone-400"
               }`}
             >
               Explain
@@ -397,8 +407,8 @@ function BuilderInner() {
               onClick={() => setRightTab("code")}
               className={`flex-1 px-3 py-2 font-medium ${
                 rightTab === "code"
-                  ? "border-b-2 border-teal-800 text-teal-900"
-                  : "text-stone-500"
+                  ? "border-b-2 border-teal-800 text-teal-900 dark:border-teal-400 dark:text-teal-300"
+                  : "text-stone-500 dark:text-stone-400"
               }`}
             >
               Code

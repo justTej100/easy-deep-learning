@@ -21,16 +21,22 @@ npm run dev
 
 Open [http://localhost:3456](http://localhost:3456) (port **3456** so it doesn’t collide with other apps on 3000).
 
+- `/` — landing page
+- `/builder` — visual PyTorch builder
+
+Light/dark mode toggles from the header on both pages (saved in `localStorage`).
+
 ## Project shape
 
-This is a **Next.js App Router** app with a single client page on purpose:
+This is a **Next.js App Router** app:
 
-- `src/app/page.tsx` — the builder UI
-- `src/app/layout.tsx` — root layout / fonts / metadata
-- `src/components/*` — React Flow canvas, palette, explain + code panels
+- `src/app/page.tsx` — landing
+- `src/app/builder/page.tsx` — builder UI
+- `src/app/layout.tsx` — root layout / fonts / theme
+- `src/components/*` — landing, React Flow canvas, palette, explain + code panels
 - `src/lib/*` — layers, shape inference, codegen, persistence, Colab export
 
-There is **no `/api`** and no extra routes — the product is backend-free (state in the browser / URL / files; Colab runs the code).
+There is **no `/api`** — the product is backend-free (state in the browser / URL / files; Colab runs the code).
 
 ## Deploy
 

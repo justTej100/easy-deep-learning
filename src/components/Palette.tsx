@@ -30,12 +30,12 @@ function PaletteItem({
         onDragStart(layerType);
       }}
       onClick={() => onAdd(layerType)}
-      className="group flex w-full flex-col items-start rounded-md border border-stone-200 bg-white px-3 py-2 text-left transition hover:border-stone-400 hover:shadow-sm"
+      className="group flex w-full flex-col items-start rounded-md border border-[var(--edl-border)] bg-[var(--edl-surface)] px-3 py-2 text-left transition hover:border-stone-400 hover:shadow-sm dark:hover:border-stone-500"
       style={{ borderLeftWidth: 3, borderLeftColor: def.color }}
       title="Drag onto canvas or click to add"
     >
-      <span className="text-sm font-medium text-stone-900">{def.label}</span>
-      <span className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-stone-500">
+      <span className="text-sm font-medium text-[var(--edl-ink)]">{def.label}</span>
+      <span className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-stone-500 dark:text-stone-400">
         {def.description}
       </span>
     </button>
@@ -44,14 +44,14 @@ function PaletteItem({
 
 export function Palette({ mode, onDragStart, onAdd }: Props) {
   return (
-    <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-stone-200 bg-stone-50">
-      <div className="border-b border-stone-200 px-4 py-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+    <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-[var(--edl-border)] bg-[var(--edl-surface-2)]">
+      <div className="border-b border-[var(--edl-border)] px-4 py-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
           Layers
         </h2>
-        <p className="mt-1 text-[11px] leading-snug text-stone-500">
+        <p className="mt-1 text-[11px] leading-snug text-stone-500 dark:text-stone-400">
           Task: classify{" "}
-          <span className="font-medium text-stone-700">{FASHION_MNIST.name}</span>{" "}
+          <span className="font-medium text-[var(--edl-ink)]">{FASHION_MNIST.name}</span>{" "}
           ({FASHION_MNIST.inputShape.join("×")} → {FASHION_MNIST.numClasses} classes)
         </p>
       </div>
@@ -66,7 +66,7 @@ export function Palette({ mode, onDragStart, onAdd }: Props) {
 
         {mode === "research" && (
           <>
-            <p className="mt-4 px-1 text-[10px] font-semibold uppercase tracking-wider text-cyan-700">
+            <p className="mt-4 px-1 text-[10px] font-semibold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">
               Research
             </p>
             {RESEARCH_PALETTE.map((t) => (
@@ -76,7 +76,7 @@ export function Palette({ mode, onDragStart, onAdd }: Props) {
         )}
       </div>
 
-      <div className="border-t border-stone-200 px-3 py-2 text-[10px] text-stone-400">
+      <div className="border-t border-[var(--edl-border)] px-3 py-2 text-[10px] text-stone-400">
         Drag onto the canvas · click to drop below selection
       </div>
     </aside>
