@@ -142,6 +142,27 @@ export function inferOutputShape(
       const size = params.outputSize ?? 1;
       return { shape: [inputShape[0], size, size], error: null };
     }
+    case "GlobalAvgPool1d": {
+      if (inputShape.length === 2) {
+        return { shape: [inputShape[0]], error: null }; // C×L → C
+      }
+      if (inputShape.length === 1) {
+        return { shape: [...inputShape], error: null };
+      }
+      return {
+        shape: null,
+        error: `GlobalAvgPool1d expects C×L (or a vector), got ${inputShape.join("×")}.`,
+      };
+    }
+    case "BatchNorm1d": {
+      if (inputShape.length !== 1 && inputShape.length !== 2) {
+        return {
+          shape: null,
+          error: `BatchNorm1d expects features or C×L, got ${inputShape.join("×")}.`,
+        };
+      }
+      return { shape: [...inputShape], error: null };
+    }
     case "BatchNorm2d": {
       if (inputShape.length !== 3) {
         return {
@@ -159,6 +180,7 @@ export function inferOutputShape(
     case "Tanh":
     case "Dropout":
     case "LoopBlock":
+    case "PositionalEncoding":
       return { shape: [...inputShape], error: null };
     case "Flatten":
       if (inputShape.length === 1) return { shape: inputShape, error: null };
@@ -222,6 +244,30 @@ export function inferOutputShape(
         return {
           shape: null,
           error: `Attention expects [seq, embed], got ${inputShape.join("×")}.`,
+        };
+      }
+      const embed = params.embedDim ?? inputShape[1];
+      const heads = params.numHeads ?? 4;
+      if (embed !== inputShape[1]) {
+        return {
+          shape: null,
+          error: `embedDim (${embed}) must match input features (${inputShape[1]}).`,
+        };
+      }
+      if (embed % heads !== 0) {
+        return {
+          shape: null,
+          error: `embedDim (${embed}) must be divisible by numHeads (${heads}).`,
+        };
+      }
+      return { shape: [...inputShape], error: null };
+    }
+    case "TransformerEncoder":
+    case "TransformerDecoder": {
+      if (inputShape.length !== 2) {
+        return {
+          shape: null,
+          error: `${layerType} expects [seq, embed], got ${inputShape.join("×")}.`,
         };
       }
       const embed = params.embedDim ?? inputShape[1];

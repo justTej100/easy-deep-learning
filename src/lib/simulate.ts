@@ -1,11 +1,11 @@
 import { formatShape, shapeProduct } from "./layers";
 import { propagateShapes } from "./shapes";
-import type { LayerNodeData, TensorShape } from "./types";
+import type { LayerNodeData, LayerType, TensorShape } from "./types";
 
 export type SimStep = {
   id: string;
   label: string;
-  layerType: string;
+  layerType: LayerType;
   inputShape: TensorShape | null;
   outputShape: TensorShape | null;
   paramsHint: string;

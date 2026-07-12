@@ -1,33 +1,55 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
+
+function BuilderLink({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const router = useRouter();
+  return (
+    <Link
+      href="/builder"
+      className={className}
+      onClick={(e) => {
+        e.preventDefault();
+        router.push("/builder");
+      }}
+    >
+      {children}
+    </Link>
+  );
+}
 
 export function LandingPage() {
   return (
-    <div className="min-h-dvh bg-[var(--edl-bg)] text-[var(--edl-ink)]">
-      <div className="edl-grid-bg pointer-events-none fixed inset-0 opacity-40 dark:opacity-25" />
+    <div className="relative min-h-dvh bg-[var(--edl-bg)] text-[var(--edl-ink)]">
+      <div
+        className="edl-grid-bg pointer-events-none absolute inset-0 -z-10 opacity-40 dark:opacity-25"
+        aria-hidden
+      />
 
       <header className="relative z-10 flex items-center justify-between px-6 py-5 md:px-10">
-        <p className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight text-teal-800 dark:text-teal-300">
+        <p className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight text-[var(--edl-ink)]">
           easy deep learning
         </p>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <Link
-            href="/builder"
-            className="rounded-md bg-teal-800 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-teal-700 dark:bg-teal-600 dark:hover:bg-teal-500"
-          >
+          <BuilderLink className="rounded-md bg-zinc-100 px-3.5 py-2 text-sm font-medium text-zinc-950 transition hover:bg-white">
             Open builder
-          </Link>
+          </BuilderLink>
         </div>
       </header>
 
       <main className="relative z-10">
-        {/* Hero — brand + one line + CTA + product visual */}
         <section className="grid min-h-[calc(100dvh-4.5rem)] grid-cols-1 items-center gap-10 px-6 pb-16 pt-6 md:grid-cols-2 md:gap-12 md:px-10 md:pb-20">
           <div className="edl-fade-up max-w-xl">
-            <p className="font-[family-name:var(--font-display)] text-5xl font-semibold leading-[1.05] tracking-tight text-teal-950 dark:text-teal-100 md:text-6xl lg:text-7xl">
+            <p className="font-[family-name:var(--font-display)] text-5xl font-semibold leading-[1.05] tracking-tight text-[var(--edl-ink)] md:text-6xl lg:text-7xl">
               easy deep learning
             </p>
             <p className="mt-5 max-w-md text-lg leading-relaxed text-stone-600 dark:text-stone-400">
@@ -35,12 +57,9 @@ export function LandingPage() {
               no black-box code dump.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                href="/builder"
-                className="edl-cta-pulse inline-flex items-center rounded-md bg-teal-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-700 dark:bg-teal-500 dark:text-teal-950 dark:hover:bg-teal-400"
-              >
+              <BuilderLink className="edl-cta-pulse inline-flex items-center rounded-md bg-zinc-100 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-white">
                 Start building
-              </Link>
+              </BuilderLink>
               <a
                 href="#how"
                 className="inline-flex items-center rounded-md border border-[var(--edl-border)] px-5 py-3 text-sm font-medium text-[var(--edl-ink)] transition hover:bg-[var(--edl-surface)]"
@@ -60,7 +79,7 @@ export function LandingPage() {
           className="border-t border-[var(--edl-border)] px-6 py-20 md:px-10"
         >
           <div className="mx-auto max-w-3xl">
-            <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight text-teal-950 dark:text-teal-100 md:text-4xl">
+            <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight text-[var(--edl-ink)] md:text-4xl">
               Teaching tool first. Architecture tool second.
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-stone-600 dark:text-stone-400">
@@ -88,7 +107,7 @@ export function LandingPage() {
                 },
               ].map((item) => (
                 <li key={item.n} className="grid grid-cols-[auto_1fr] gap-4 md:gap-6">
-                  <span className="font-mono text-sm text-teal-700 dark:text-teal-400">
+                  <span className="font-mono text-sm text-[var(--edl-muted)]">
                     {item.n}
                   </span>
                   <div>
@@ -108,19 +127,16 @@ export function LandingPage() {
         <section className="border-t border-[var(--edl-border)] px-6 py-20 md:px-10">
           <div className="mx-auto flex max-w-3xl flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div>
-              <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight text-teal-950 dark:text-teal-100">
+              <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight text-[var(--edl-ink)]">
                 Ready when you are.
               </h2>
               <p className="mt-2 text-stone-600 dark:text-stone-400">
                 No signup. State lives in your browser, share link, or project file.
               </p>
             </div>
-            <Link
-              href="/builder"
-              className="inline-flex shrink-0 items-center rounded-md bg-teal-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-700 dark:bg-teal-500 dark:text-teal-950 dark:hover:bg-teal-400"
-            >
+            <BuilderLink className="inline-flex shrink-0 items-center rounded-md bg-zinc-100 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-white">
               Open the builder
-            </Link>
+            </BuilderLink>
           </div>
         </section>
       </main>
@@ -146,8 +162,8 @@ function NetworkHeroVisual() {
       >
         <defs>
           <linearGradient id="edl-flow" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#0f766e" stopOpacity="0.9" />
-            <stop offset="100%" stopColor="#155e75" stopOpacity="0.5" />
+            <stop offset="0%" stopColor="#a1a1aa" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#52525b" stopOpacity="0.45" />
           </linearGradient>
         </defs>
 
@@ -192,7 +208,7 @@ function NetworkHeroVisual() {
               cx={cx}
               cy={cy}
               r={i === 9 ? 14 : 11}
-              className="fill-teal-700 stroke-[var(--edl-bg)] dark:fill-teal-400"
+              className="fill-zinc-400 stroke-[var(--edl-bg)]"
               strokeWidth="3"
               style={{ animationDelay: `${i * 0.08}s` }}
             />

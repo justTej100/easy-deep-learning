@@ -5,12 +5,14 @@
 ## What it does
 
 - Build a Fashion-MNIST image classifier from beginner layers (Conv2d, MaxPool, Flatten, Linear, ReLU, Dropout, Softmax)
-- Live shape checking with plain-English errors
+- Expanded catalog: BatchNorm, LSTM/GRU, Attention, Add/Concat, and more
+- Live shape checking with plain-English errors + forward-pass Simulate tab
 - Per-layer explanations (what / why / analogy) plus editable params
-- Annotated `nn.Module` code generation (comments explain *why*)
-- Export: copy code, download `.py`, download `.ipynb`, or open Colab (downloads notebook + opens Colab upload)
+- Annotated code generation for **PyTorch** and **Keras**
+- Export: copy code, download `.py`, download `.ipynb`, or open Colab
+- Architecture templates (CNN, MLP, LeNet-style, LSTM, …)
 - Share via URL hash (compressed JSON) or download/import a project file
-- **Research mode**: Loop Block → shared-weight `for _ in range(N)` (looped / recurrent-depth idea)
+- **Research mode**: Loop Block → shared-weight `for _ in range(N)`
 
 ## Run locally
 
@@ -46,6 +48,10 @@ Deploy to Vercel from this repo. No env vars or database required.
 
 - No in-browser or server-side training / code execution
 - Verification is offloaded to Google Colab or the user’s own machine
+
+## Future ideas
+
+- **Google Docs–style live collaborative editor** — multiple people editing the same network canvas in real time (cursors, shared graph state, presence). Not built yet; may land in a later update if we add a lightweight realtime backend.
 
 ## Stack
 

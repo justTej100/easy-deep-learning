@@ -8,7 +8,7 @@ const Builder = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex h-dvh items-center justify-center bg-[var(--edl-bg)] text-[var(--edl-muted)]">
-        <p className="font-[family-name:var(--font-display)] text-xl text-teal-800 dark:text-teal-300">
+        <p className="font-[family-name:var(--font-display)] text-xl text-zinc-200 dark:text-zinc-300">
           easy deep learning
         </p>
       </div>

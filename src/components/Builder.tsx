@@ -31,7 +31,6 @@ import { Palette } from "@/components/Palette";
 import { ExplainPanel } from "@/components/ExplainPanel";
 import { CodePanel } from "@/components/CodePanel";
 import { SimulatePanel } from "@/components/SimulatePanel";
-import { TemplateMenu } from "@/components/TemplateMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/components/ThemeProvider";
 import { propagateShapes } from "@/lib/shapes";
@@ -43,12 +42,15 @@ import {
   toProjectState,
 } from "@/lib/project";
 import { getTemplate, type TemplateId } from "@/lib/templates";
+import { generateCode } from "@/lib/codegen";
 import {
   downloadProjectFile,
   loadProjectFile,
   readProjectFromLocation,
   writeProjectToUrl,
+  downloadPythonFile,
 } from "@/lib/persistence";
+import { downloadColabProject } from "@/lib/export";
 import type { LayerNodeData, LayerParams, LayerType } from "@/lib/types";
 
 const nodeTypes = { layer: LayerNode };
@@ -106,10 +108,14 @@ function BuilderInner() {
   const [mode, setMode] = useState<"beginner" | "research">(initial.mode);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<"explain" | "code" | "simulate">("explain");
+  const [shareCopied, setShareCopied] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const { screenToFlowPosition } = useReactFlow();
   const fileRef = useRef<HTMLInputElement>(null);
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
   const idCounter = useRef(0);
   const lastFp = useRef("");
+  const shareResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const nodesFingerprint = nodes
     .map((n) => `${n.id}:${n.data.layerType}:${JSON.stringify(n.data.params)}`)
@@ -133,6 +139,67 @@ function BuilderInner() {
     }, 400);
     return () => clearTimeout(t);
   }, [nodes, edges, mode]);
+
+  useEffect(() => {
+    if (!downloadOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      const target = e.target;
+      if (
+        downloadMenuRef.current &&
+        target instanceof Element &&
+        !downloadMenuRef.current.contains(target)
+      ) {
+        setDownloadOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setDownloadOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [downloadOpen]);
+
+  const projectState = useMemo(
+    () => toProjectState(nodes, edges, mode),
+    [nodes, edges, mode],
+  );
+
+  function getPyTorchCode() {
+    const { code, error } = generateCode(
+      nodes.map((n) => ({ id: n.id, data: n.data })),
+      edges.map((e) => ({ source: e.source, target: e.target })),
+      { framework: "pytorch" },
+    );
+    return { code, error };
+  }
+
+  function handleDownloadJson() {
+    downloadProjectFile(projectState);
+    setDownloadOpen(false);
+  }
+
+  function handleDownloadPython() {
+    const { code, error } = getPyTorchCode();
+    if (!code) {
+      alert(error ?? "Could not generate Python for this graph.");
+      return;
+    }
+    downloadPythonFile(code, "fashion_mnist_net.py");
+    setDownloadOpen(false);
+  }
+
+  function handleDownloadColab() {
+    const result = downloadColabProject(projectState);
+    if (!result.ok) {
+      alert(result.error);
+      return;
+    }
+    setDownloadOpen(false);
+  }
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -247,7 +314,7 @@ function BuilderInner() {
         <div className="mr-2">
           <Link
             href="/"
-            className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight text-teal-900 dark:text-teal-300"
+            className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight text-[var(--edl-ink)]"
           >
             easy deep learning
           </Link>
@@ -262,8 +329,8 @@ function BuilderInner() {
             onClick={() => setMode("beginner")}
             className={`rounded px-2.5 py-1 font-medium ${
               mode === "beginner"
-                ? "bg-teal-800 text-white dark:bg-teal-600"
-                : "text-stone-600 hover:bg-[var(--edl-surface-2)] dark:text-stone-300"
+                ? "bg-zinc-100 text-zinc-950"
+                : "text-stone-400 hover:bg-[var(--edl-surface-2)]"
             }`}
           >
             Beginner
@@ -273,8 +340,8 @@ function BuilderInner() {
             onClick={() => setMode("research")}
             className={`rounded px-2.5 py-1 font-medium ${
               mode === "research"
-                ? "bg-cyan-800 text-white dark:bg-cyan-700"
-                : "text-stone-600 hover:bg-[var(--edl-surface-2)] dark:text-stone-300"
+                ? "bg-zinc-200 text-zinc-950"
+                : "text-stone-400 hover:bg-[var(--edl-surface-2)]"
             }`}
           >
             Research
@@ -289,7 +356,6 @@ function BuilderInner() {
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <ThemeToggle />
-          <TemplateMenu onLoad={loadTemplate} />
           <button
             type="button"
             onClick={resetStarter}
@@ -297,15 +363,63 @@ function BuilderInner() {
           >
             Reset starter CNN
           </button>
-          <button
-            type="button"
-            onClick={() =>
-              downloadProjectFile(toProjectState(nodes, edges, mode))
-            }
-            className="rounded border border-[var(--edl-border)] bg-[var(--edl-surface)] px-2.5 py-1 text-[11px] font-medium text-stone-700 hover:bg-[var(--edl-surface-2)] dark:text-stone-300"
-          >
-            Download project
-          </button>
+          <div className="relative" ref={downloadMenuRef}>
+            <button
+              type="button"
+              onClick={() => setDownloadOpen((o) => !o)}
+              aria-expanded={downloadOpen}
+              aria-haspopup="menu"
+              className="rounded border border-[var(--edl-border)] bg-[var(--edl-surface)] px-2.5 py-1 text-[11px] font-medium text-stone-700 hover:bg-[var(--edl-surface-2)] dark:text-stone-300"
+            >
+              Download project
+            </button>
+            {downloadOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 z-50 mt-1 w-56 overflow-hidden rounded-md border border-[var(--edl-border)] bg-[var(--edl-surface)] py-1 shadow-lg"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleDownloadJson}
+                  className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-[var(--edl-surface-2)]"
+                >
+                  <span className="text-[12px] font-medium text-[var(--edl-ink)]">
+                    JSON project
+                  </span>
+                  <span className="text-[10px] text-stone-500">
+                    Re-import into the builder
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleDownloadPython}
+                  className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-[var(--edl-surface-2)]"
+                >
+                  <span className="text-[12px] font-medium text-[var(--edl-ink)]">
+                    Python (.py)
+                  </span>
+                  <span className="text-[10px] text-stone-500">
+                    Annotated PyTorch model file
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleDownloadColab}
+                  className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-[var(--edl-surface-2)]"
+                >
+                  <span className="text-[12px] font-medium text-[var(--edl-ink)]">
+                    Google Colab (.ipynb)
+                  </span>
+                  <span className="text-[10px] text-stone-500">
+                    One notebook — cell per layer block
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
@@ -343,10 +457,25 @@ function BuilderInner() {
             onClick={() => {
               writeProjectToUrl(toProjectState(nodes, edges, mode));
               void navigator.clipboard.writeText(window.location.href);
+              setShareCopied(true);
+              if (shareResetRef.current) clearTimeout(shareResetRef.current);
+              shareResetRef.current = setTimeout(() => setShareCopied(false), 1400);
             }}
-            className="rounded bg-teal-800 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-teal-700 dark:bg-teal-600 dark:hover:bg-teal-500"
+            className={`relative inline-flex h-7 w-[7.75rem] shrink-0 items-center justify-center rounded bg-zinc-100 text-[11px] font-medium text-zinc-950 transition-colors hover:bg-white ${
+              shareCopied ? "edl-btn-clicked bg-emerald-300 hover:bg-emerald-300" : ""
+            }`}
           >
-            Copy share link
+            <span className={shareCopied ? "invisible" : undefined}>
+              Copy share link
+            </span>
+            <span
+              className={`absolute inset-0 flex items-center justify-center ${
+                shareCopied ? "" : "invisible"
+              }`}
+              aria-live="polite"
+            >
+              Link copied
+            </span>
           </button>
         </div>
       </header>
@@ -356,6 +485,7 @@ function BuilderInner() {
           mode={mode}
           onDragStart={() => undefined}
           onAdd={(t) => addLayer(t)}
+          onLoadTemplate={loadTemplate}
         />
 
         <div className="relative min-w-0 flex-1">
@@ -384,18 +514,18 @@ function BuilderInner() {
             />
             <Controls showInteractive={false} />
             <MiniMap
-              nodeColor={() => (isDark ? "#2dd4bf" : "#0f766e")}
+              nodeColor={() => (isDark ? "#a1a1aa" : "#52525b")}
               maskColor={isDark ? "rgba(0,0,0,0.35)" : "rgba(28,25,23,0.1)"}
               className="!bg-[var(--edl-surface)]/80"
             />
           </ReactFlow>
 
           {mode === "research" && (
-            <div className="pointer-events-none absolute left-3 top-3 max-w-sm rounded-md border border-cyan-200 bg-cyan-50/95 px-3 py-2 text-[11px] leading-relaxed text-cyan-950 shadow-sm dark:border-cyan-800 dark:bg-cyan-950/90 dark:text-cyan-100">
+            <div className="pointer-events-none absolute left-3 top-3 max-w-sm rounded-md border border-[var(--edl-border)] bg-[var(--edl-surface)]/95 px-3 py-2 text-[11px] leading-relaxed text-[var(--edl-ink)] shadow-sm">
               <strong className="font-semibold">Research mode:</strong> drop a
               Loop Block to reuse shared weights N times — the code generator
               emits a{" "}
-              <code className="rounded bg-cyan-100 px-1 font-mono dark:bg-cyan-900">
+              <code className="rounded bg-zinc-800 px-1 font-mono dark:bg-zinc-100">
                 for _ in range(N)
               </code>{" "}
               over one module.
@@ -410,7 +540,7 @@ function BuilderInner() {
               onClick={() => setRightTab("explain")}
               className={`flex-1 px-3 py-2 font-medium ${
                 rightTab === "explain"
-                  ? "border-b-2 border-teal-800 text-teal-900 dark:border-teal-400 dark:text-teal-300"
+                  ? "border-b-2 border-zinc-400 text-[var(--edl-ink)]"
                   : "text-stone-500 dark:text-stone-400"
               }`}
             >
@@ -421,7 +551,7 @@ function BuilderInner() {
               onClick={() => setRightTab("simulate")}
               className={`flex-1 px-3 py-2 font-medium ${
                 rightTab === "simulate"
-                  ? "border-b-2 border-teal-800 text-teal-900 dark:border-teal-400 dark:text-teal-300"
+                  ? "border-b-2 border-zinc-400 text-[var(--edl-ink)]"
                   : "text-stone-500 dark:text-stone-400"
               }`}
             >
@@ -432,7 +562,7 @@ function BuilderInner() {
               onClick={() => setRightTab("code")}
               className={`flex-1 px-3 py-2 font-medium ${
                 rightTab === "code"
-                  ? "border-b-2 border-teal-800 text-teal-900 dark:border-teal-400 dark:text-teal-300"
+                  ? "border-b-2 border-zinc-400 text-[var(--edl-ink)]"
                   : "text-stone-500 dark:text-stone-400"
               }`}
             >

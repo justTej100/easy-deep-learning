@@ -3,30 +3,32 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-:root {
-  --background: #f3efe6;
-  --foreground: #1c1917;
-  --edl-bg: #f3efe6;
-  --edl-ink: #1c1917;
-  --edl-muted: #78716c;
-  --edl-surface: #fffcf7;
-  --edl-surface-2: #ebe6dc;
-  --edl-border: #d6d3d1;
-  --edl-teal: #0f766e;
-  --edl-canvas: #f3efe6;
+/* App is dark-first. Light vars kept for the toggle. */
+:root,
+.dark {
+  --background: #0a0a0a;
+  --foreground: #f4f4f5;
+  --edl-bg: #0a0a0a;
+  --edl-ink: #f4f4f5;
+  --edl-muted: #a1a1aa;
+  --edl-surface: #141414;
+  --edl-surface-2: #1c1c1c;
+  --edl-border: #2a2a2a;
+  --edl-accent: #e4e4e7;
+  --edl-canvas: #111111;
 }
 
-.dark {
-  --background: #0c1210;
-  --foreground: #e7e5e4;
-  --edl-bg: #0c1210;
-  --edl-ink: #e7e5e4;
-  --edl-muted: #a8a29e;
-  --edl-surface: #141c19;
-  --edl-surface-2: #1c2622;
-  --edl-border: #2a3531;
-  --edl-teal: #2dd4bf;
-  --edl-canvas: #0f1614;
+html:not(.dark) {
+  --background: #f4f4f5;
+  --foreground: #18181b;
+  --edl-bg: #f4f4f5;
+  --edl-ink: #18181b;
+  --edl-muted: #71717a;
+  --edl-surface: #ffffff;
+  --edl-surface-2: #e4e4e7;
+  --edl-border: #d4d4d8;
+  --edl-accent: #27272a;
+  --edl-canvas: #ececee;
 }
 
 @theme inline {
@@ -48,7 +50,6 @@ body {
   font-family: var(--font-display), Georgia, serif;
 }
 
-/* React Flow tweaks */
 .react-flow__node {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
@@ -57,23 +58,28 @@ body {
   display: none;
 }
 
-.dark .react-flow__controls-button {
-  background: var(--edl-surface);
-  border-color: var(--edl-border);
-  fill: var(--edl-ink);
+.react-flow__controls-button {
+  background: var(--edl-surface) !important;
+  border-color: var(--edl-border) !important;
+  fill: var(--edl-ink) !important;
 }
 
-.dark .react-flow__minimap {
+.react-flow__minimap {
   background: var(--edl-surface) !important;
 }
 
-/* Landing motion */
 .edl-grid-bg {
   background-image:
-    linear-gradient(to right, color-mix(in oklab, var(--edl-teal) 12%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in oklab, var(--edl-teal) 12%, transparent) 1px, transparent 1px);
+    linear-gradient(to right, color-mix(in oklab, #fff 6%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, #fff 6%, transparent) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 75%);
+}
+
+html:not(.dark) .edl-grid-bg {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, #000 8%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, #000 8%, transparent) 1px, transparent 1px);
 }
 
 @keyframes edl-fade-up {
@@ -111,10 +117,19 @@ body {
 @keyframes edl-cta-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, #0f766e 35%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in oklab, #fff 18%, transparent);
   }
   50% {
     box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+@keyframes edl-btn-flash {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, #fff 35%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent;
   }
 }
 
@@ -141,9 +156,13 @@ body {
   animation: edl-cta-pulse 2.4s ease-out infinite;
 }
 
+.edl-btn-clicked {
+  animation: edl-btn-flash 0.55s ease-out;
+}
+
 .edl-hero-glow {
   background:
-    radial-gradient(ellipse 80% 60% at 70% 40%, color-mix(in oklab, var(--edl-teal) 18%, transparent), transparent 70%),
+    radial-gradient(ellipse 80% 60% at 70% 40%, color-mix(in oklab, #fff 8%, transparent), transparent 70%),
     var(--edl-surface);
 }
 
@@ -152,7 +171,8 @@ body {
   .edl-fade-up-delay,
   .edl-edge-draw path,
   .edl-nodes-pulse circle,
-  .edl-cta-pulse {
+  .edl-cta-pulse,
+  .edl-btn-clicked {
     animation: none;
   }
 }

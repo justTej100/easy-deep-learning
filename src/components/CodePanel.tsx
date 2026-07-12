@@ -51,7 +51,7 @@ export function CodePanel({ nodes, edges }: Props) {
             type="button"
             onClick={() => setFramework("pytorch")}
             className={`rounded px-2 py-0.5 ${
-              framework === "pytorch" ? "bg-amber-600 text-white" : "text-stone-400"
+              framework === "pytorch" ? "bg-zinc-100 text-zinc-950" : "text-stone-400"
             }`}
           >
             PyTorch
@@ -60,7 +60,7 @@ export function CodePanel({ nodes, edges }: Props) {
             type="button"
             onClick={() => setFramework("keras")}
             className={`rounded px-2 py-0.5 ${
-              framework === "keras" ? "bg-amber-600 text-white" : "text-stone-400"
+              framework === "keras" ? "bg-zinc-100 text-zinc-950" : "text-stone-400"
             }`}
           >
             Keras
@@ -96,7 +96,7 @@ export function CodePanel({ nodes, edges }: Props) {
               type="button"
               disabled={!code}
               onClick={handleColab}
-              className="rounded bg-amber-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-amber-500 disabled:opacity-40"
+              className="rounded bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-950 hover:bg-white disabled:opacity-40"
             >
               Colab
             </button>

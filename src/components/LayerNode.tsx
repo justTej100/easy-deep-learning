@@ -4,6 +4,7 @@ import { memo } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import type { LayerNodeData } from "@/lib/types";
 import { LAYER_DEFS, formatShape } from "@/lib/layers";
+import { LayerTypeIcon } from "@/components/LayerIcons";
 
 export type LayerFlowNode = Node<LayerNodeData, "layer">;
 
@@ -15,7 +16,7 @@ function LayerNodeComponent({ data, selected }: NodeProps<LayerFlowNode>) {
     <div
       className={`min-w-[180px] rounded-lg border-2 bg-[var(--edl-surface)] shadow-sm transition-shadow ${
         selected
-          ? "ring-2 ring-offset-2 ring-teal-600 shadow-md ring-offset-[var(--edl-canvas)]"
+          ? "ring-2 ring-offset-2 ring-zinc-400 shadow-md ring-offset-[var(--edl-canvas)]"
           : ""
       } ${hasError ? "border-rose-500" : "border-[var(--edl-border)]"}`}
       style={{ borderTopColor: def.color, borderTopWidth: 4 }}
@@ -42,8 +43,9 @@ function LayerNodeComponent({ data, selected }: NodeProps<LayerFlowNode>) {
             </span>
           )}
         </div>
-        <div className="mt-0.5 text-sm font-semibold text-[var(--edl-ink)]">
-          {def.label}
+        <div className="mt-1.5 flex items-center gap-2">
+          <LayerTypeIcon type={data.layerType} color={def.color} />
+          <div className="text-sm font-semibold text-[var(--edl-ink)]">{def.label}</div>
         </div>
         <div className="mt-1 font-mono text-[11px] text-stone-500 dark:text-stone-400">
           {data.layerType === "Input" ? (
@@ -57,7 +59,7 @@ function LayerNodeComponent({ data, selected }: NodeProps<LayerFlowNode>) {
           )}
         </div>
         {data.layerType === "LoopBlock" && (
-          <div className="mt-1 text-[11px] text-cyan-800 dark:text-cyan-300">
+          <div className="mt-1 text-[11px] text-[var(--edl-muted)]">
             ×{data.params.repeats ?? 2} shared passes
           </div>
         )}

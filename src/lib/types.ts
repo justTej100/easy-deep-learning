@@ -5,15 +5,20 @@ export type LayerType =
   | "MaxPool2d"
   | "AvgPool2d"
   | "AdaptiveAvgPool2d"
+  | "GlobalAvgPool1d"
+  | "BatchNorm1d"
   | "BatchNorm2d"
   | "LayerNorm"
   | "Flatten"
   | "Reshape"
   | "Linear"
   | "Embedding"
+  | "PositionalEncoding"
   | "LSTM"
   | "GRU"
   | "MultiheadAttention"
+  | "TransformerEncoder"
+  | "TransformerDecoder"
   | "ReLU"
   | "LeakyReLU"
   | "GELU"
@@ -54,9 +59,12 @@ export type LayerParams = {
   hiddenSize?: number;
   numLayers?: number;
   bidirectional?: number; // 0 | 1 for number input
-  // Attention
+  // Attention / Transformer
   numHeads?: number;
   embedDim?: number;
+  ffDim?: number;
+  // Positional encoding
+  maxLen?: number;
   // Reshape
   reshapeChannels?: number;
   reshapeHeight?: number;

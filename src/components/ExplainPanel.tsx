@@ -3,6 +3,7 @@
 import { LAYER_DEFS, formatShape } from "@/lib/layers";
 import type { LayerNodeData, LayerParams } from "@/lib/types";
 import { FASHION_MNIST } from "@/lib/types";
+import { LayerTypeIcon } from "@/components/LayerIcons";
 
 type Props = {
   data: LayerNodeData | null;
@@ -18,7 +19,7 @@ export function ExplainPanel({ data, onChangeParams }: Props) {
           Click any node to see what it does in plain English, why you&apos;d use it, and
           tweak its settings.
         </p>
-        <div className="mt-6 rounded-md bg-teal-50 px-3 py-2 text-[12px] leading-relaxed text-teal-900 dark:bg-teal-950 dark:text-teal-100">
+        <div className="mt-6 rounded-md bg-zinc-900/40 px-3 py-2 text-[12px] leading-relaxed text-zinc-100 dark:bg-zinc-900 dark:text-zinc-100">
           <strong className="font-semibold">Task:</strong> {FASHION_MNIST.description}
         </div>
       </div>
@@ -30,19 +31,24 @@ export function ExplainPanel({ data, onChangeParams }: Props) {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div
-        className="border-b border-[var(--edl-border)] px-4 py-3 dark:opacity-95"
+        className="border-b border-[var(--edl-border)] px-4 py-3"
         style={{ background: def.accent }}
       >
-        <p
-          className="text-[10px] font-semibold uppercase tracking-wider"
-          style={{ color: def.color }}
-        >
-          {def.category}
-        </p>
-        <h3 className="text-base font-semibold text-stone-900">{def.label}</h3>
-        <p className="mt-1 font-mono text-[11px] text-stone-600">
-          {formatShape(data.inputShape)} → {formatShape(data.outputShape)}
-        </p>
+        <div className="flex items-start gap-3">
+          <LayerTypeIcon type={data.layerType} color={def.color} />
+          <div className="min-w-0">
+            <p
+              className="text-[10px] font-semibold uppercase tracking-wider"
+              style={{ color: def.color }}
+            >
+              {def.category}
+            </p>
+            <h3 className="text-base font-semibold text-[var(--edl-ink)]">{def.label}</h3>
+            <p className="mt-1 font-mono text-[11px] text-[var(--edl-muted)]">
+              {formatShape(data.inputShape)} → {formatShape(data.outputShape)}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="space-y-4 px-4 py-3 text-[13px] leading-relaxed text-stone-700 dark:text-stone-300">
@@ -77,8 +83,8 @@ export function ExplainPanel({ data, onChangeParams }: Props) {
         </section>
 
         {data.layerType === "LoopBlock" && (
-          <section className="rounded-md border border-cyan-200 bg-cyan-50 px-3 py-2 text-cyan-950 dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-100">
-            <h4 className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">
+          <section className="rounded-md border border-zinc-700 bg-zinc-900/40 px-3 py-2 text-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
+            <h4 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-300 dark:text-zinc-400">
               Research idea
             </h4>
             <p className="mt-1">
@@ -108,7 +114,7 @@ export function ExplainPanel({ data, onChangeParams }: Props) {
                   </span>
                   <input
                     type="number"
-                    className="mt-1 w-full rounded border border-[var(--edl-border)] bg-[var(--edl-surface)] px-2 py-1.5 text-sm text-[var(--edl-ink)] outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
+                    className="mt-1 w-full rounded border border-[var(--edl-border)] bg-[var(--edl-surface)] px-2 py-1.5 text-sm text-[var(--edl-ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
                     min={field.min}
                     max={field.max}
                     step={field.step ?? 1}

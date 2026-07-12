@@ -28,23 +28,18 @@ function applyTheme(theme: Theme) {
 }
 
 function readTheme(): Theme {
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined") return "dark";
   const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
   if (stored === "light" || stored === "dark") return stored;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "dark";
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(readTheme);
-  const [ready, setReady] = useState(() => typeof window !== "undefined");
 
   useEffect(() => {
     applyTheme(theme);
-    if (!ready) {
-      const id = requestAnimationFrame(() => setReady(true));
-      return () => cancelAnimationFrame(id);
-    }
-  }, [theme, ready]);
+  }, [theme]);
 
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next);
@@ -63,7 +58,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
-      <div className={ready ? "contents" : "invisible contents"}>{children}</div>
+      {children}
     </ThemeContext.Provider>
   );
 }
