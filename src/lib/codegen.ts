@@ -1,12 +1,8 @@
-import { LAYER_DEFS } from "./layers";
-import type { LayerNodeData, LayerParams, ProjectState } from "./types";
+import { LAYER_DEFS, inputShapeFromParams } from "./layers";
+import type { LayerNodeData, ProjectState } from "./types";
 import { FASHION_MNIST } from "./types";
 
-type GenNode = {
-  id: string;
-  data: LayerNodeData;
-};
-
+type GenNode = { id: string; data: LayerNodeData };
 type GenEdge = { source: string; target: string };
 
 function topoSort(nodes: GenNode[], edges: GenEdge[]): string[] | null {
@@ -39,132 +35,475 @@ function topoSort(nodes: GenNode[], edges: GenEdge[]): string[] | null {
 }
 
 function safeName(layerType: string, index: number): string {
-  const base = layerType.toLowerCase().replace(/[^a-z0-9]/g, "_");
-  return `${base}_${index}`;
+  return `${layerType.toLowerCase().replace(/[^a-z0-9]/g, "_")}_${index}`;
 }
 
-function initLine(
-  name: string,
-  layerType: LayerNodeData["layerType"],
-  params: LayerParams,
-  inFeatures: number | null,
-): { code: string; comment: string } | null {
-  switch (layerType) {
-    case "Input":
-      return null;
-    case "Conv2d":
-      return {
-        code: `self.${name} = nn.Conv2d(in_channels, ${params.outChannels ?? 32}, kernel_size=${params.kernelSize ?? 3}, stride=${params.stride ?? 1}, padding=${params.padding ?? 0})`,
-        comment: `Learn ${params.outChannels ?? 32} local filters (edges/textures). in_channels is set dynamically from the previous tensor.`,
-      };
-    case "MaxPool2d":
-      return {
-        code: `self.${name} = nn.MaxPool2d(kernel_size=${params.poolKernel ?? 2}, stride=${params.poolStride ?? 2})`,
-        comment: "Downsample spatial size; keep the strongest activation in each window.",
-      };
-    case "Flatten":
-      return {
-        code: `self.${name} = nn.Flatten()`,
-        comment: "Collapse C×H×W into a single feature vector for Linear layers.",
-      };
-    case "Linear":
-      return {
-        code: `self.${name} = nn.Linear(${inFeatures ?? "in_features"}, ${params.outFeatures ?? 128})`,
-        comment: `Fully connect every input feature to ${params.outFeatures ?? 128} outputs.`,
-      };
-    case "ReLU":
-      return {
-        code: `self.${name} = nn.ReLU()`,
-        comment: "Non-linearity: zero out negatives so stacked layers aren't just one linear map.",
-      };
-    case "Dropout":
-      return {
-        code: `self.${name} = nn.Dropout(p=${params.p ?? 0.25})`,
-        comment: `Randomly drop ${Math.round((params.p ?? 0.25) * 100)}% of activations during training to reduce overfitting.`,
-      };
-    case "Softmax":
-      return {
-        code: `self.${name} = nn.Softmax(dim=${params.dim ?? -1})`,
-        comment:
-          "Turn logits into probabilities. Optional for training with CrossEntropyLoss (which already applies log-softmax).",
-      };
-    case "Output":
-      return {
-        code: `self.${name} = nn.Linear(${inFeatures ?? "in_features"}, ${params.numClasses ?? FASHION_MNIST.numClasses})`,
-        comment: `Classification head: one score per Fashion-MNIST class (${params.numClasses ?? FASHION_MNIST.numClasses} total).`,
-      };
-    case "LoopBlock":
-      return {
-        code: `# Loop block "${name}" — shared weights applied ${params.repeats ?? 2}× (see forward)`,
-        comment:
-          "Recurrent depth: reuse the same parameters to trade inference compute for capacity.",
-      };
-    default:
-      return null;
-  }
+function getInChannels(data: LayerNodeData): number | null {
+  if (data.inputShape?.length === 3) return data.inputShape[0];
+  if (data.inputShape?.length === 2) return data.inputShape[0];
+  return null;
 }
 
-function forwardLine(
-  name: string,
-  layerType: LayerNodeData["layerType"],
-  params: LayerParams,
-): string | null {
-  switch (layerType) {
-    case "Input":
-      return null;
-    case "LoopBlock": {
-      const n = params.repeats ?? 2;
-      return [
-        `# Shared-weight loop (research idea: looped / recurrent-depth transformers)`,
-        `for _ in range(${n}):`,
-        `    x = self.${name}_shared(x)  # same weights each pass`,
-      ].join("\n        ");
-    }
-    default:
-      return `x = self.${name}(x)`;
-  }
-}
-
-/** Infer in_channels / in_features from propagated shapes on node data. */
 function getInFeatures(data: LayerNodeData): number | null {
-  if (!data.inputShape) return null;
-  if (data.layerType === "Linear" || data.layerType === "Output") {
-    if (data.inputShape.length === 1) return data.inputShape[0];
-    return null;
-  }
-  if (data.layerType === "Conv2d") {
-    if (data.inputShape.length === 3) return data.inputShape[0];
-  }
+  if (data.inputShape?.length === 1) return data.inputShape[0];
   return null;
 }
 
-function resolveInFeatures(
-  data: LayerNodeData,
-  prevOut: number[] | null | undefined,
-): number | null {
-  const fromSelf = getInFeatures(data);
-  if (fromSelf != null) return fromSelf;
-  if (!prevOut) return null;
-  if (data.layerType === "Linear" || data.layerType === "Output") {
-    if (prevOut.length === 1) return prevOut[0];
-    return prevOut.reduce((a, b) => a * b, 1);
-  }
-  if (data.layerType === "Conv2d" && prevOut.length === 3) return prevOut[0];
-  return null;
-}
+export type Framework = "pytorch" | "keras";
 
 export type CodeGenResult = {
   code: string;
   error: string | null;
 };
 
-export function generatePyTorchCode(
+function generatePyTorch(
   nodes: GenNode[],
   edges: GenEdge[],
-  options?: { className?: string; includeTrainStub?: boolean },
+  order: string[],
+  className: string,
+  includeTrainStub: boolean,
+): string {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const incoming = new Map<string, string[]>();
+  for (const n of nodes) incoming.set(n.id, []);
+  for (const e of edges) {
+    if (byId.has(e.source) && byId.has(e.target)) {
+      incoming.get(e.target)!.push(e.source);
+    }
+  }
+
+  const names = new Map<string, string>();
+  let idx = 0;
+  for (const id of order) {
+    if (byId.get(id)!.data.layerType === "Input") continue;
+    names.set(id, safeName(byId.get(id)!.data.layerType, idx++));
+  }
+
+  const varNames = new Map<string, string>();
+  const initLines: string[] = [];
+  const forwardLines: string[] = [];
+
+  for (const id of order) {
+    const n = byId.get(id)!;
+    const { layerType, params } = n.data;
+
+    if (layerType === "Input") {
+      const shape = inputShapeFromParams(params);
+      forwardLines.push(`# x batch shape: (N, ${shape.join(", ")})`);
+      varNames.set(id, "x");
+      continue;
+    }
+
+    const name = names.get(id)!;
+    const preds = incoming.get(id)!;
+    const srcVars = preds.map((p) => varNames.get(p) ?? "x");
+
+    const emitInit = (code: string, comment: string) => {
+      initLines.push(`        # ${comment}`);
+      initLines.push(`        ${code}`);
+    };
+
+    switch (layerType) {
+      case "Conv2d":
+        emitInit(
+          `self.${name} = nn.Conv2d(${getInChannels(n.data) ?? 1}, ${params.outChannels ?? 32}, kernel_size=${params.kernelSize ?? 3}, stride=${params.stride ?? 1}, padding=${params.padding ?? 0})`,
+          LAYER_DEFS.Conv2d.why,
+        );
+        break;
+      case "Conv1d":
+        emitInit(
+          `self.${name} = nn.Conv1d(${getInChannels(n.data) ?? 1}, ${params.outChannels ?? 64}, kernel_size=${params.kernelSize ?? 3}, stride=${params.stride ?? 1}, padding=${params.padding ?? 0})`,
+          LAYER_DEFS.Conv1d.why,
+        );
+        break;
+      case "MaxPool2d":
+        emitInit(
+          `self.${name} = nn.MaxPool2d(kernel_size=${params.poolKernel ?? 2}, stride=${params.poolStride ?? 2})`,
+          LAYER_DEFS.MaxPool2d.why,
+        );
+        break;
+      case "AvgPool2d":
+        emitInit(
+          `self.${name} = nn.AvgPool2d(kernel_size=${params.poolKernel ?? 2}, stride=${params.poolStride ?? 2})`,
+          LAYER_DEFS.AvgPool2d.why,
+        );
+        break;
+      case "AdaptiveAvgPool2d":
+        emitInit(
+          `self.${name} = nn.AdaptiveAvgPool2d((${params.outputSize ?? 1}, ${params.outputSize ?? 1}))`,
+          LAYER_DEFS.AdaptiveAvgPool2d.why,
+        );
+        break;
+      case "BatchNorm2d":
+        emitInit(
+          `self.${name} = nn.BatchNorm2d(${getInChannels(n.data) ?? 32})`,
+          LAYER_DEFS.BatchNorm2d.why,
+        );
+        break;
+      case "LayerNorm": {
+        const shape = n.data.inputShape ?? [64];
+        emitInit(
+          `self.${name} = nn.LayerNorm(${shape.length === 1 ? shape[0] : shape[shape.length - 1]})`,
+          LAYER_DEFS.LayerNorm.why,
+        );
+        break;
+      }
+      case "Flatten":
+        emitInit(`self.${name} = nn.Flatten()`, LAYER_DEFS.Flatten.why);
+        break;
+      case "Reshape":
+        // handled in forward
+        break;
+      case "Linear":
+      case "Output": {
+        const out =
+          layerType === "Output"
+            ? (params.numClasses ?? FASHION_MNIST.numClasses)
+            : (params.outFeatures ?? 128);
+        emitInit(
+          `self.${name} = nn.Linear(${getInFeatures(n.data) ?? "in_features"}, ${out})`,
+          layerType === "Output" ? LAYER_DEFS.Output.why : LAYER_DEFS.Linear.why,
+        );
+        break;
+      }
+      case "Embedding":
+        emitInit(
+          `self.${name} = nn.Embedding(${params.numEmbeddings ?? 1000}, ${params.embeddingDim ?? 64})`,
+          LAYER_DEFS.Embedding.why,
+        );
+        break;
+      case "LSTM":
+      case "GRU": {
+        const Cls = layerType === "LSTM" ? "LSTM" : "GRU";
+        const inSize =
+          n.data.inputShape?.length === 2
+            ? n.data.inputShape[1]
+            : (n.data.inputShape?.[0] ?? 64);
+        emitInit(
+          `self.${name} = nn.${Cls}(${inSize}, ${params.hiddenSize ?? 128}, num_layers=${params.numLayers ?? 1}, batch_first=True, bidirectional=${(params.bidirectional ?? 0) === 1})`,
+          LAYER_DEFS[layerType].why,
+        );
+        break;
+      }
+      case "MultiheadAttention":
+        emitInit(
+          `self.${name} = nn.MultiheadAttention(${params.embedDim ?? 64}, ${params.numHeads ?? 4}, batch_first=True)`,
+          LAYER_DEFS.MultiheadAttention.why,
+        );
+        break;
+      case "ReLU":
+        emitInit(`self.${name} = nn.ReLU()`, LAYER_DEFS.ReLU.why);
+        break;
+      case "LeakyReLU":
+        emitInit(
+          `self.${name} = nn.LeakyReLU(negative_slope=${params.negativeSlope ?? 0.01})`,
+          LAYER_DEFS.LeakyReLU.why,
+        );
+        break;
+      case "GELU":
+        emitInit(`self.${name} = nn.GELU()`, LAYER_DEFS.GELU.why);
+        break;
+      case "Sigmoid":
+        emitInit(`self.${name} = nn.Sigmoid()`, LAYER_DEFS.Sigmoid.why);
+        break;
+      case "Tanh":
+        emitInit(`self.${name} = nn.Tanh()`, LAYER_DEFS.Tanh.why);
+        break;
+      case "Dropout":
+        emitInit(`self.${name} = nn.Dropout(p=${params.p ?? 0.25})`, LAYER_DEFS.Dropout.why);
+        break;
+      case "Softmax":
+        emitInit(
+          `self.${name} = nn.Softmax(dim=${params.dim ?? -1})`,
+          LAYER_DEFS.Softmax.why,
+        );
+        break;
+      case "LoopBlock": {
+        const repeats = params.repeats ?? 2;
+        const shape = n.data.inputShape;
+        initLines.push(`        # Loop Block: shared weights ×${repeats}`);
+        if (shape?.length === 3) {
+          const c = shape[0];
+          initLines.push(`        self.${name}_shared = nn.Sequential(`);
+          initLines.push(`            nn.Conv2d(${c}, ${c}, 3, padding=1),`);
+          initLines.push(`            nn.ReLU(),`);
+          initLines.push(`        )`);
+        } else if (shape?.length === 1) {
+          const d = shape[0];
+          initLines.push(`        self.${name}_shared = nn.Sequential(`);
+          initLines.push(`            nn.Linear(${d}, ${d}),`);
+          initLines.push(`            nn.ReLU(),`);
+          initLines.push(`        )`);
+        } else {
+          initLines.push(`        self.${name}_shared = nn.Identity()`);
+        }
+        break;
+      }
+      case "Add":
+      case "Concat":
+        break;
+      default:
+        break;
+    }
+
+    // Forward
+    if (layerType === "Add") {
+      forwardLines.push(
+        `${name}_out = ${srcVars[0]} + ${srcVars[1] ?? srcVars[0]}  # residual add`,
+      );
+      varNames.set(id, `${name}_out`);
+      continue;
+    }
+    if (layerType === "Concat") {
+      const dim = (params.concatDim ?? 0) + 1; // +1 for batch dim
+      forwardLines.push(
+        `${name}_out = torch.cat([${srcVars.join(", ")}], dim=${dim})  # concat`,
+      );
+      varNames.set(id, `${name}_out`);
+      continue;
+    }
+    if (layerType === "Reshape") {
+      forwardLines.push(
+        `${name}_out = ${srcVars[0]}.view(-1, ${params.reshapeChannels ?? 1}, ${params.reshapeHeight ?? 28}, ${params.reshapeWidth ?? 28})  # reshape`,
+      );
+      varNames.set(id, `${name}_out`);
+      continue;
+    }
+    if (layerType === "LSTM" || layerType === "GRU") {
+      forwardLines.push(`${name}_out, _ = self.${name}(${srcVars[0]})  # ${layerType}`);
+      varNames.set(id, `${name}_out`);
+      continue;
+    }
+    if (layerType === "MultiheadAttention") {
+      forwardLines.push(
+        `${name}_out, _ = self.${name}(${srcVars[0]}, ${srcVars[0]}, ${srcVars[0]})  # self-attention`,
+      );
+      varNames.set(id, `${name}_out`);
+      continue;
+    }
+    if (layerType === "LoopBlock") {
+      const repeats = params.repeats ?? 2;
+      forwardLines.push(`${name}_out = ${srcVars[0]}`);
+      forwardLines.push(`for _ in range(${repeats}):`);
+      forwardLines.push(`    ${name}_out = self.${name}_shared(${name}_out)`);
+      varNames.set(id, `${name}_out`);
+      continue;
+    }
+
+    forwardLines.push(
+      `${name}_out = self.${name}(${srcVars[0]})  # ${LAYER_DEFS[layerType].label}`,
+    );
+    varNames.set(id, `${name}_out`);
+  }
+
+  const lastId = [...order].reverse().find((id) => byId.get(id)!.data.layerType !== "Input");
+  const retVar = lastId ? (varNames.get(lastId) ?? "x") : "x";
+
+  const trainStub = includeTrainStub
+    ? `
+
+if __name__ == "__main__":
+    import torch
+    model = ${className}()
+    # Dummy batch — replace with your DataLoader
+    x = torch.randn(2, ${inputShapeFromParams(nodes.find((n) => n.data.layerType === "Input")?.data.params ?? {}).join(", ")})
+    y = model(x)
+    print(y.shape)
+`
+    : "";
+
+  return `"""
+Generated by easy deep learning — annotated PyTorch export
+"""
+import torch
+import torch.nn as nn
+
+
+class ${className}(nn.Module):
+    def __init__(self):
+        super().__init__()
+${initLines.length ? initLines.join("\n") : "        pass"}
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+${forwardLines.map((l) => "        " + l).join("\n")}
+        return ${retVar}
+${trainStub}`;
+}
+
+function generateKeras(
+  nodes: GenNode[],
+  edges: GenEdge[],
+  order: string[],
+  className: string,
+): string {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const incoming = new Map<string, string[]>();
+  for (const n of nodes) incoming.set(n.id, []);
+  for (const e of edges) {
+    if (byId.has(e.source) && byId.has(e.target)) {
+      incoming.get(e.target)!.push(e.source);
+    }
+  }
+
+  const names = new Map<string, string>();
+  let idx = 0;
+  for (const id of order) {
+    if (byId.get(id)!.data.layerType === "Input") continue;
+    names.set(id, safeName(byId.get(id)!.data.layerType, idx++));
+  }
+
+  const varNames = new Map<string, string>();
+  const lines: string[] = [];
+
+  const inputNode = nodes.find((n) => n.data.layerType === "Input");
+  const inShape = inputShapeFromParams(inputNode?.data.params ?? {});
+  // Keras uses channels_last for images
+  let kerasInputShape: string;
+  if (inShape.length === 3) {
+    kerasInputShape = `(${inShape[1]}, ${inShape[2]}, ${inShape[0]})  # H, W, C`;
+  } else if (inShape.length === 2) {
+    kerasInputShape = `(${inShape[0]}, ${inShape[1]})`;
+  } else {
+    kerasInputShape = `(${inShape[0]},)`;
+  }
+
+  lines.push(`inputs = keras.Input(shape=${kerasInputShape})`);
+  if (inputNode) varNames.set(inputNode.id, "inputs");
+
+  for (const id of order) {
+    const n = byId.get(id)!;
+    const { layerType, params } = n.data;
+    if (layerType === "Input") continue;
+
+    const name = names.get(id)!;
+    const preds = incoming.get(id)!;
+    const srcVars = preds.map((p) => varNames.get(p) ?? "inputs");
+    let expr = "";
+
+    switch (layerType) {
+      case "Conv2d":
+        expr = `layers.Conv2D(${params.outChannels ?? 32}, ${params.kernelSize ?? 3}, strides=${params.stride ?? 1}, padding="${(params.padding ?? 0) > 0 ? "same" : "valid"}", name="${name}")(${srcVars[0]})`;
+        break;
+      case "Conv1d":
+        expr = `layers.Conv1D(${params.outChannels ?? 64}, ${params.kernelSize ?? 3}, strides=${params.stride ?? 1}, padding="${(params.padding ?? 0) > 0 ? "same" : "valid"}", name="${name}")(${srcVars[0]})`;
+        break;
+      case "MaxPool2d":
+        expr = `layers.MaxPooling2D(${params.poolKernel ?? 2}, strides=${params.poolStride ?? 2}, name="${name}")(${srcVars[0]})`;
+        break;
+      case "AvgPool2d":
+        expr = `layers.AveragePooling2D(${params.poolKernel ?? 2}, strides=${params.poolStride ?? 2}, name="${name}")(${srcVars[0]})`;
+        break;
+      case "AdaptiveAvgPool2d":
+        expr = `layers.GlobalAveragePooling2D(name="${name}")(${srcVars[0]})` ;
+        break;
+      case "BatchNorm2d":
+        expr = `layers.BatchNormalization(name="${name}")(${srcVars[0]})`;
+        break;
+      case "LayerNorm":
+        expr = `layers.LayerNormalization(name="${name}")(${srcVars[0]})`;
+        break;
+      case "Flatten":
+        expr = `layers.Flatten(name="${name}")(${srcVars[0]})`;
+        break;
+      case "Reshape":
+        expr = `layers.Reshape((${params.reshapeHeight ?? 28}, ${params.reshapeWidth ?? 28}, ${params.reshapeChannels ?? 1}), name="${name}")(${srcVars[0]})`;
+        break;
+      case "Linear":
+        expr = `layers.Dense(${params.outFeatures ?? 128}, name="${name}")(${srcVars[0]})`;
+        break;
+      case "Output":
+        expr = `layers.Dense(${params.numClasses ?? FASHION_MNIST.numClasses}, name="${name}")(${srcVars[0]})`;
+        break;
+      case "Embedding":
+        expr = `layers.Embedding(${params.numEmbeddings ?? 1000}, ${params.embeddingDim ?? 64}, name="${name}")(${srcVars[0]})`;
+        break;
+      case "LSTM":
+        expr = `layers.LSTM(${params.hiddenSize ?? 128}, return_sequences=True, name="${name}")(${srcVars[0]})`;
+        break;
+      case "GRU":
+        expr = `layers.GRU(${params.hiddenSize ?? 128}, return_sequences=True, name="${name}")(${srcVars[0]})`;
+        break;
+      case "MultiheadAttention":
+        expr = `layers.MultiHeadAttention(${params.numHeads ?? 4}, key_dim=${Math.floor((params.embedDim ?? 64) / (params.numHeads ?? 4))}, name="${name}")(${srcVars[0]}, ${srcVars[0]})`;
+        break;
+      case "ReLU":
+        expr = `layers.ReLU(name="${name}")(${srcVars[0]})`;
+        break;
+      case "LeakyReLU":
+        expr = `layers.LeakyReLU(negative_slope=${params.negativeSlope ?? 0.01}, name="${name}")(${srcVars[0]})`;
+        break;
+      case "GELU":
+        expr = `layers.Activation("gelu", name="${name}")(${srcVars[0]})`;
+        break;
+      case "Sigmoid":
+        expr = `layers.Activation("sigmoid", name="${name}")(${srcVars[0]})`;
+        break;
+      case "Tanh":
+        expr = `layers.Activation("tanh", name="${name}")(${srcVars[0]})`;
+        break;
+      case "Dropout":
+        expr = `layers.Dropout(${params.p ?? 0.25}, name="${name}")(${srcVars[0]})`;
+        break;
+      case "Softmax":
+        expr = `layers.Softmax(name="${name}")(${srcVars[0]})`;
+        break;
+      case "Add":
+        expr = `layers.Add(name="${name}")([${srcVars.join(", ")}])`;
+        break;
+      case "Concat":
+        expr = `layers.Concatenate(axis=${(params.concatDim ?? 0) === 0 ? -1 : (params.concatDim ?? 0) + 1}, name="${name}")([${srcVars.join(", ")}])`;
+        break;
+      case "LoopBlock": {
+        const repeats = params.repeats ?? 2;
+        lines.push(`# Loop block ${name}: shared dense refine ×${repeats}`);
+        lines.push(`${name}_h = ${srcVars[0]}`);
+        lines.push(`for _ in range(${repeats}):`);
+        lines.push(`    ${name}_h = layers.Dense(${n.data.inputShape?.[n.data.inputShape.length - 1] ?? 64}, activation="relu")(${name}_h)`);
+        varNames.set(id, `${name}_h`);
+        continue;
+      }
+      default:
+        expr = `${srcVars[0]}  # unsupported ${layerType}`;
+    }
+
+    lines.push(`${name} = ${expr}  # ${LAYER_DEFS[layerType].shortLabel}`);
+    varNames.set(id, name);
+  }
+
+  const lastId = [...order].reverse().find((id) => byId.get(id)!.data.layerType !== "Input");
+  const outVar = lastId ? (varNames.get(lastId) ?? "inputs") : "inputs";
+
+  return `"""
+Generated by easy deep learning — annotated Keras / TensorFlow export
+"""
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+
+
+def build_${className.toLowerCase()}():
+${lines.map((l) => "    " + l).join("\n")}
+    model = keras.Model(inputs=inputs, outputs=${outVar}, name="${className}")
+    return model
+
+
+if __name__ == "__main__":
+    model = build_${className.toLowerCase()}()
+    model.summary()
+`;
+}
+
+export function generateCode(
+  nodes: GenNode[],
+  edges: GenEdge[],
+  options?: {
+    className?: string;
+    includeTrainStub?: boolean;
+    framework?: Framework;
+  },
 ): CodeGenResult {
-  const className = options?.className ?? "FashionMNISTNet";
-  const includeTrainStub = options?.includeTrainStub ?? true;
+  const className = options?.className ?? "VisualNet";
+  const framework = options?.framework ?? "pytorch";
 
   if (nodes.length === 0) {
     return { code: "", error: "Add some layers to the canvas first." };
@@ -174,170 +513,37 @@ export function generatePyTorchCode(
   if (!order) {
     return {
       code: "",
-      error:
-        "Can't generate code: the graph has a cycle. Remove the cycle, or use a Loop Block in Research mode.",
+      error: "Can't generate code: the graph has a cycle. Use a Loop Block instead.",
     };
   }
 
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const inputNodes = nodes.filter((n) => n.data.layerType === "Input");
-  if (inputNodes.length === 0) {
-    return { code: "", error: "Add an Input node (Fashion-MNIST) to start the network." };
+  if (!nodes.some((n) => n.data.layerType === "Input")) {
+    return { code: "", error: "Add an Input node to start the network." };
   }
 
-  // Walk path and assign module names
-  const names = new Map<string, string>();
-  let idx = 0;
-  for (const id of order) {
-    const n = byId.get(id)!;
-    if (n.data.layerType === "Input") continue;
-    names.set(id, safeName(n.data.layerType, idx++));
+  if (framework === "keras") {
+    return { code: generateKeras(nodes, edges, order, className), error: null };
   }
 
-  const initLines: string[] = [];
-  const forwardLines: string[] = [];
-  let prevOut: number[] | null = [...FASHION_MNIST.inputShape];
+  return {
+    code: generatePyTorch(
+      nodes,
+      edges,
+      order,
+      className,
+      options?.includeTrainStub ?? true,
+    ),
+    error: null,
+  };
+}
 
-  for (const id of order) {
-    const n = byId.get(id)!;
-    const { layerType, params } = n.data;
-    if (layerType === "Input") {
-      forwardLines.push(
-        `# x starts as a Fashion-MNIST batch: (N, ${FASHION_MNIST.inputShape.join(", ")})`,
-      );
-      prevOut = n.data.outputShape ? [...n.data.outputShape] : [...FASHION_MNIST.inputShape];
-      continue;
-    }
-
-    const name = names.get(id)!;
-    const inFeat = resolveInFeatures(n.data, prevOut);
-
-    if (layerType === "Conv2d") {
-      const inCh = inFeat ?? FASHION_MNIST.inputShape[0];
-      initLines.push(`        # ${LAYER_DEFS.Conv2d.why}`);
-      initLines.push(
-        `        self.${name} = nn.Conv2d(${inCh}, ${params.outChannels ?? 32}, kernel_size=${params.kernelSize ?? 3}, stride=${params.stride ?? 1}, padding=${params.padding ?? 0})  # ${params.outChannels ?? 32} filters looking for local patterns`,
-      );
-      forwardLines.push(`x = self.${name}(x)  # conv → feature maps`);
-      prevOut = n.data.outputShape ? [...n.data.outputShape] : null;
-      continue;
-    }
-
-    if (layerType === "LoopBlock") {
-      const repeats = params.repeats ?? 2;
-      const shape = n.data.inputShape ?? prevOut;
-      initLines.push(`        # --- Loop Block: shared weights, applied ${repeats}× ---`);
-      initLines.push(
-        `        # Idea: looped/recurrent-depth models spend more compute at inference without new parameters.`,
-      );
-      if (shape && shape.length === 3) {
-        const c = shape[0];
-        initLines.push(`        self.${name}_shared = nn.Sequential(`);
-        initLines.push(
-          `            nn.Conv2d(${c}, ${c}, kernel_size=3, padding=1),  # shape-preserving conv`,
-        );
-        initLines.push(`            nn.ReLU(),`);
-        initLines.push(`        )`);
-      } else if (shape && shape.length === 1) {
-        const d = shape[0];
-        initLines.push(`        self.${name}_shared = nn.Sequential(`);
-        initLines.push(`            nn.Linear(${d}, ${d}),  # shape-preserving linear`);
-        initLines.push(`            nn.ReLU(),`);
-        initLines.push(`        )`);
-      } else {
-        initLines.push(
-          `        self.${name}_shared = nn.Identity()  # connect the loop so shapes resolve`,
-        );
-      }
-      forwardLines.push(
-        `# Recurrent depth: refine representation ${repeats} times with shared weights`,
-      );
-      forwardLines.push(`for _ in range(${repeats}):`);
-      forwardLines.push(`    x = self.${name}_shared(x)`);
-      prevOut = n.data.outputShape ? [...n.data.outputShape] : shape ? [...shape] : prevOut;
-      continue;
-    }
-
-    const line = initLine(name, layerType, params, inFeat);
-    if (line) {
-      initLines.push(`        # ${line.comment}`);
-      initLines.push(`        ${line.code}`);
-    }
-    const fwd = forwardLine(name, layerType, params);
-    if (fwd) {
-      if (fwd.includes("\n")) {
-        forwardLines.push(fwd);
-      } else {
-        forwardLines.push(`${fwd}  # ${LAYER_DEFS[layerType].label}`);
-      }
-    }
-    prevOut = n.data.outputShape ? [...n.data.outputShape] : prevOut;
-  }
-
-  const trainStub = includeTrainStub
-    ? `
-
-# ---------------------------------------------------------------------------
-# Optional: tiny training sketch for Fashion-MNIST (run in Colab / locally)
-# CrossEntropyLoss expects raw logits — if you included Softmax, remove it
-# from the model when training, or switch to NLLLoss on log-probabilities.
-# ---------------------------------------------------------------------------
-if __name__ == "__main__":
-    from torchvision import datasets, transforms
-    from torch.utils.data import DataLoader
-
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.2860,), (0.3530,)),  # Fashion-MNIST-ish stats
-    ])
-    train_ds = datasets.FashionMNIST(root="./data", train=True, download=True, transform=transform)
-    train_loader = DataLoader(train_ds, batch_size=64, shuffle=True)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ${className}().to(device)
-    opt = torch.optim.Adam(model.parameters(), lr=1e-3)
-    loss_fn = nn.CrossEntropyLoss()
-
-    model.train()
-    for epoch in range(1):  # bump this when you're ready
-        total = 0.0
-        for xb, yb in train_loader:
-            xb, yb = xb.to(device), yb.to(device)
-            opt.zero_grad()
-            logits = model(xb)
-            # If the model ends with Softmax, this is not ideal — prefer raw logits.
-            loss = loss_fn(logits, yb)
-            loss.backward()
-            opt.step()
-            total += loss.item()
-        print(f"epoch {epoch + 1} loss={total / len(train_loader):.4f}")
-`
-    : "";
-
-  const code = `"""
-Fashion-MNIST image classifier — generated by easy deep learning
-Task: classify 28×28 grayscale clothing images into ${FASHION_MNIST.numClasses} classes.
-Every comment below explains *why* the line exists, not just what it does.
-"""
-import torch
-import torch.nn as nn
-
-
-class ${className}(nn.Module):
-    """Visual-builder export: layers follow your canvas order (topological sort)."""
-
-    def __init__(self):
-        super().__init__()
-        # Layers are registered here so PyTorch tracks their parameters for training.
-${initLines.length ? initLines.join("\n") : "        pass  # empty model"}
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Data flows top → bottom, matching edges on the canvas.
-${forwardLines.map((l) => "        " + l).join("\n")}
-        return x
-${trainStub}`;
-
-  return { code, error: null };
+/** @deprecated use generateCode */
+export function generatePyTorchCode(
+  nodes: GenNode[],
+  edges: GenEdge[],
+  options?: { className?: string; includeTrainStub?: boolean },
+): CodeGenResult {
+  return generateCode(nodes, edges, { ...options, framework: "pytorch" });
 }
 
 export function projectToGenInput(state: ProjectState) {

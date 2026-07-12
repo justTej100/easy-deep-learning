@@ -79,12 +79,12 @@ export function LandingPage() {
                 {
                   n: "02",
                   title: "Catch shape bugs early",
-                  body: "Live inference flags mismatches like “this outputs 64 numbers, but the next layer expects 128.”",
+                  body: "Live inference plus a Simulate tab that walks the forward pass and estimates parameter counts.",
                 },
                 {
                   n: "03",
-                  title: "Run it where PyTorch already lives",
-                  body: "Copy code, download a notebook, or open Colab. We don’t host training — you verify for free.",
+                  title: "Export PyTorch or Keras",
+                  body: "Copy code, download .py / .ipynb, or open Colab. Templates cover CNNs, MLPs, LeNet, and LSTMs.",
                 },
               ].map((item) => (
                 <li key={item.n} className="grid grid-cols-[auto_1fr] gap-4 md:gap-6">

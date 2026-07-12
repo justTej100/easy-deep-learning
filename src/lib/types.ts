@@ -1,34 +1,75 @@
 export type LayerType =
   | "Input"
   | "Conv2d"
+  | "Conv1d"
   | "MaxPool2d"
+  | "AvgPool2d"
+  | "AdaptiveAvgPool2d"
+  | "BatchNorm2d"
+  | "LayerNorm"
   | "Flatten"
+  | "Reshape"
   | "Linear"
+  | "Embedding"
+  | "LSTM"
+  | "GRU"
+  | "MultiheadAttention"
   | "ReLU"
+  | "LeakyReLU"
+  | "GELU"
+  | "Sigmoid"
+  | "Tanh"
   | "Dropout"
   | "Softmax"
+  | "Add"
+  | "Concat"
   | "Output"
   | "LoopBlock";
 
-export type TensorShape = number[]; // e.g. [1, 28, 28] or [10]
+export type TensorShape = number[];
 
 export type LayerParams = {
-  // Conv2d
+  // Conv
   outChannels?: number;
   kernelSize?: number;
   stride?: number;
   padding?: number;
-  // MaxPool2d
+  // Pool
   poolKernel?: number;
   poolStride?: number;
-  // Linear
+  // Adaptive pool
+  outputSize?: number;
+  // Linear / Dense
   outFeatures?: number;
   // Dropout
   p?: number;
-  // Softmax
+  // Softmax / LayerNorm
   dim?: number;
+  // LeakyReLU
+  negativeSlope?: number;
+  // Embedding
+  numEmbeddings?: number;
+  embeddingDim?: number;
+  // LSTM / GRU
+  hiddenSize?: number;
+  numLayers?: number;
+  bidirectional?: number; // 0 | 1 for number input
+  // Attention
+  numHeads?: number;
+  embedDim?: number;
+  // Reshape
+  reshapeChannels?: number;
+  reshapeHeight?: number;
+  reshapeWidth?: number;
+  // Concat
+  concatDim?: number;
   // LoopBlock
   repeats?: number;
+  // Input presets
+  inChannels?: number;
+  height?: number;
+  width?: number;
+  seqLen?: number;
   // Output
   numClasses?: number;
 };
@@ -40,7 +81,6 @@ export type LayerNodeData = {
   inputShape?: TensorShape | null;
   outputShape?: TensorShape | null;
   error?: string | null;
-  /** For LoopBlock: ordered child node ids inside the loop */
   childIds?: string[];
   [key: string]: unknown;
 };
@@ -82,3 +122,11 @@ export const FASHION_MNIST = {
     "Ankle boot",
   ],
 };
+
+export const INPUT_PRESETS = {
+  fashionMnist: { label: "Fashion-MNIST", shape: [1, 28, 28] as TensorShape },
+  mnist: { label: "MNIST", shape: [1, 28, 28] as TensorShape },
+  rgb224: { label: "RGB 224×224", shape: [3, 224, 224] as TensorShape },
+  rgb32: { label: "CIFAR-like 32×32", shape: [3, 32, 32] as TensorShape },
+  sequence: { label: "Sequence (tokens)", shape: [128] as TensorShape },
+} as const;

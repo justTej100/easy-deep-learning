@@ -30,15 +30,19 @@ import { LayerNode, type LayerFlowNode } from "@/components/LayerNode";
 import { Palette } from "@/components/Palette";
 import { ExplainPanel } from "@/components/ExplainPanel";
 import { CodePanel } from "@/components/CodePanel";
+import { SimulatePanel } from "@/components/SimulatePanel";
+import { TemplateMenu } from "@/components/TemplateMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/components/ThemeProvider";
 import { propagateShapes } from "@/lib/shapes";
+import { LAYER_DEFS } from "@/lib/layers";
 import {
   createStarterGraph,
   fromProjectState,
   makeLayerData,
   toProjectState,
 } from "@/lib/project";
+import { getTemplate, type TemplateId } from "@/lib/templates";
 import {
   downloadProjectFile,
   loadProjectFile,
@@ -101,7 +105,7 @@ function BuilderInner() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
   const [mode, setMode] = useState<"beginner" | "research">(initial.mode);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [rightTab, setRightTab] = useState<"explain" | "code">("explain");
+  const [rightTab, setRightTab] = useState<"explain" | "code" | "simulate">("explain");
   const { screenToFlowPosition } = useReactFlow();
   const fileRef = useRef<HTMLInputElement>(null);
   const idCounter = useRef(0);
@@ -133,14 +137,25 @@ function BuilderInner() {
   const onConnect = useCallback(
     (connection: Connection) => {
       setEdges((eds) => {
-        const cleaned = eds.filter((e) => e.target !== connection.target);
+        const targetNode = nodes.find((n) => n.id === connection.target);
+        const multiOk =
+          targetNode && LAYER_DEFS[targetNode.data.layerType].allowsMultiInput;
+        const existing = eds.filter((e) => e.target === connection.target);
+        let cleaned = eds;
+        if (!multiOk) {
+          cleaned = eds.filter((e) => e.target !== connection.target);
+        } else if (existing.length >= 2) {
+          // keep newest two — drop oldest
+          const dropId = existing[0]?.id;
+          cleaned = eds.filter((e) => e.id !== dropId);
+        }
         return addEdge(
-          { ...connection, id: `e-${connection.source}-${connection.target}` },
+          { ...connection, id: `e-${connection.source}-${connection.target}-${Date.now()}` },
           cleaned,
         );
       });
     },
-    [setEdges],
+    [setEdges, nodes],
   );
 
   const onSelectionChange = useCallback((params: OnSelectionChangeParams) => {
@@ -212,6 +227,16 @@ function BuilderInner() {
     setSelectedId(null);
   };
 
+  const loadTemplate = (id: TemplateId) => {
+    const t = getTemplate(id);
+    if (!t) return;
+    const g = t.build();
+    lastFp.current = "";
+    setNodes(applyShapes(g.nodes, g.edges) as LayerFlowNode[]);
+    setEdges(g.edges);
+    setSelectedId(null);
+  };
+
   const errorCount = nodes.filter((n) => n.data.error).length;
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -264,6 +289,7 @@ function BuilderInner() {
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <ThemeToggle />
+          <TemplateMenu onLoad={loadTemplate} />
           <button
             type="button"
             onClick={resetStarter}
@@ -392,6 +418,17 @@ function BuilderInner() {
             </button>
             <button
               type="button"
+              onClick={() => setRightTab("simulate")}
+              className={`flex-1 px-3 py-2 font-medium ${
+                rightTab === "simulate"
+                  ? "border-b-2 border-teal-800 text-teal-900 dark:border-teal-400 dark:text-teal-300"
+                  : "text-stone-500 dark:text-stone-400"
+              }`}
+            >
+              Simulate
+            </button>
+            <button
+              type="button"
               onClick={() => setRightTab("code")}
               className={`flex-1 px-3 py-2 font-medium ${
                 rightTab === "code"
@@ -407,6 +444,14 @@ function BuilderInner() {
               <ExplainPanel
                 data={selectedNode?.data ?? null}
                 onChangeParams={updateSelectedParams}
+              />
+            ) : rightTab === "simulate" ? (
+              <SimulatePanel
+                nodes={nodes.map((n) => ({ id: n.id, data: n.data }))}
+                edges={edges.map((e) => ({
+                  source: e.source,
+                  target: e.target,
+                }))}
               />
             ) : (
               <CodePanel
