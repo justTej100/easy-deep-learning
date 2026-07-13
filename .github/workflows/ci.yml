@@ -38,5 +38,10 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Next.js may read this during build; keep CI explicit.
           NODE_ENV: production
+
+      - name: notify vercel
+        if: always()
+        uses: 'vercel/repository-dispatch/actions/status@v1'
+        with:
+          name: 'Vercel - easy-deep-learning: build'
