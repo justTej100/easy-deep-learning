@@ -40,10 +40,6 @@ This is a **Next.js App Router** app:
 
 There is **no `/api`** — the product is backend-free (state in the browser / URL / files; Colab runs the code).
 
-## Deploy
-
-Deploy to Vercel from this repo. No env vars or database required.
-
 ## Out of scope (by design)
 
 - No in-browser or server-side training / code execution
